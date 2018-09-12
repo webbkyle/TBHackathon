@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>D3 Page Template</title>
+        <script type="text/javascript" src="https://d3js.org/d3.v5.min.js"></script>
+        <style type="text/css">
+          .mods {
+              /*display: inline-block;
+              width: 20px;
+              height: 75px;   We'll override height later
+              margin-right: 5px;
+              background-color: teal;*/
+              cursor: normal;
+          }
+        </style>
+    </head>
+    <body>
+        <script type="text/javascript">
+        var h = 900;
+        var w = 1500;
+        var mouse = [w,h/2];
+        var mouseold = [w,h/2];
+        var cmDataset = ['TP', 'FN', 'FP', 'TN'];
+        var j48data = [];
+        var rocLinedata = [];
+        var cmLabelSz = 35;
+        var cmSmLabSz = 20;
+        var cmWidth = 150;
+        var cmPad = 100;
+        var cmTextSz = 25;
+        var svgCmW = 2 * (cmPad + cmWidth);
+        var svgCmH = svgCmW;
+        var svgModW = w;
+        var svgModH = svgCmW/2;
+        var svgRocW = svgCmW * 1.5
+        var svgRocH = svgCmH * 1.5
+        var rocLabSz = 20;
+        var margin = {top: 20, right: 40, bottom: 75, left: 50};
+        var rectW = 200;
+        var rectH = 100;
+        var refresh = 0;
+        var freeze = 0;
+        var cmData = {j48:[2, 34, 5, 67], xray:[12, 4, 6, 76], ctscan:[12, 3, 5, 90], ensemble:[100, 1, 1, 100]}
+        //var nMods = ['J48 CART', 'XRAY', 'CTScan', 'Ensemble'];
+        var nMods = [[0, 'J48 CART'], [1, 'XRAY'] , [2, 'CT Scan'], [3, 'Ensemble']];
+        //var mt = d3.mouse(this)[0];
+        for(var i = 0; i < 1000; i++) rocLinedata.push([i, i]);
+
+        console.log(cmData.j48)
+
+        //d3.csvParse()
+
+        /*d3.select("body").selectAll("div")
+          .data(dataset)
+          .enter()
+          .append("div")
+          .attr('class', 'bar')
+          .style('height', function(d){
+            var barheight = d * 5
+            return barheight + "px";
+          });*/
+        var svgCM = d3.select("body").append("svg")
+                      .attr("width", svgCmW)
+                      .attr("height", svgCmH);
+
+        var svgRoc = d3.select("body").append("svg")
+                      .attr("width", svgRocW)
+                      .attr("height", svgRocH);
+
+        var svgModels = d3.select("body").append("svg")
+                          .attr("class", "mods")
+                          .attr("width", svgModW)
+                          .attr("height", rectH);
+
+
+        var gRoc = svgRoc.append("g")
+                          .attr("transform", "translate(" + margin.left + ","
+                            + margin.top + ")");
+
+        var x = d3.scaleLinear()
+            .rangeRound([0, svgRocW - margin.right]);
+
+        var y = d3.scaleLinear()
+            .rangeRound([svgRocH - margin.bottom, 0]);
+
+        var line = d3.line()
+            .x(function(d) { return x(d[0]); })
+            .y(function(d) { return y(d[1]); });
+
+        svgModels.on("mousemove", function(){
+            if(freeze!==0){return 0;}
+            mouse = d3.mouse(this);
+        });
+
+        svgModels.selectAll(".rect.buttons")
+          .data(nMods)
+          .enter()
+          .append("rect")
+            .attr("class", "grayrect")
+            .attr("x", function(d){
+              return cmPad*d[0] + rectW*d[0];
+            })
+            .attr("y", 0)
+            .attr("height", rectH)
+            .attr("width", rectW)
+            .attr("fill", "gray")
+            .attr("fill-opacity", 0.4)
+            .attr("id", function(d,i){
+              return "name" + i;
+            });
+
+        svgModels.selectAll(".text.buttons")
+          .data(nMods)
+          .enter()
+          .append("text")
+            .attr("x", function(d){
+              return cmPad + cmPad*d[0] + rectW*d[0];
+            })
+            .attr("y", 50)
+            .attr("text-anchor", "middle")
+            .style("fill", "black")
+            .style("font-weight", "bold")
+            .style("font-family", "Courier")
+            .style("font-size", "20px")
+            .text(function(d){
+              return d[1];
+            });
+
+      var plotData = function(location, ind){
+        d3.csv(location).then(function(data) {
+           ndata = data.map(function(d) { return [ +d["x.vals"], +d["y.vals"] ]; });
+           //console.log(ndata);
+           if(ind === 'j48'){
+             rocPlot(ndata, cmData.j48);
+           } else {
+             rocPlot([]);
+           }
+        });
+      };
+
+
+
+        svgModels.on("click", function(){
+            mouseX = mouse[0]
+            mouseY = mouse[1]
+            name0fl = parseFloat(d3.selectAll("#name0").attr("x"))
+            name1fl = parseFloat(d3.selectAll("#name1").attr("x"))
+            name2fl = parseFloat(d3.selectAll("#name2").attr("x"))
+            name3fl = parseFloat(d3.selectAll("#name3").attr("x"))
+            if(name0fl < mouseX && mouseX < name0fl + 200){
+              plotData("j48results.csv", 'j48')
+              cmFix(cmData.j48);
+            } else if(name1fl < mouseX && mouseX < name1fl + 200){
+              console.log("XRAY");
+            } else if(name2fl < mouseX && mouseX < name2fl + 200){
+              console.log("CT Scan");
+            } else if(name3fl < mouseX && mouseX < name3fl + 200){
+              console.log("Ensemble");
+            } else {
+              clearPlot();
+            }
+          });
+
+        /*var plotPoints = function(name){
+          if(name === 'j48'){
+            gRoc.append("path")
+                .datum(j48data)
+                .attr("fill", "none")
+                .attr("stroke", "teal")
+                .attr("stroke-linejoin", "round")
+                .attr("stroke-linecap", "round")
+                .attr("stroke-width", 1.5)
+                .attr("d", line);
+          }
+        }*/
+
+        gRoc.append("g")
+            .attr("transform", "translate(0," + String(svgRocH - margin.bottom) + ")")
+            .call(d3.axisBottom(x))
+            .append("text")
+            .attr("fill", "#000")
+            .attr("y", -20)
+            .attr("font-size", String(rocLabSz) + "px")
+            .attr("x", svgRocW - margin.left)
+            .attr("dy", "0.71em")
+            .attr("text-anchor", "end")
+            .text("FNR");
+
+        gRoc.append("g")
+            .call(d3.axisLeft(y))
+            .append("text")
+            .attr("fill", "#000")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("font-size", String(rocLabSz) + "px")
+            .attr("dy", "0.71em")
+            .attr("text-anchor", "end")
+            .text("TPR");
+
+        gRoc.append("path")
+            .datum(rocLinedata)
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-linejoin", "round")
+            .attr("stroke-linecap", "round")
+            .attr("stroke-width", 1.5)
+            .attr("d", line);
+
+        var clearPlot = function(){
+            d3.select("path.j48").remove();
+            //d3.selectAll("text.cmText").remove();
+          };
+
+        var rocPlot = function(data){
+            gRoc.append("path")
+              .datum(data)
+              .attr("class", "j48")
+              .attr("fill", "none")
+              .attr("stroke", "teal")
+              .attr("stroke-linejoin", "round")
+              .attr("stroke-linecap", "round")
+              .attr("stroke-width", 1.5)
+              .attr("d", line);
+            };
+
+        var cmFix = function(data){
+         svgCM.selectAll('text')
+           .data(data)
+           .enter()
+           .append("text")
+           .text(function(d) {
+             return(d);
+           })
+           .attr("x", function(d, i) {
+             return i < 2 ? cmPad + (cmWidth)/2 : cmPad + 1.5 * cmWidth;
+           })
+           .attr("y", function(d, i) {
+             return i % 2 === 0 ? cmPad + (cmWidth)/2 : cmPad + 1.5 * cmWidth;
+           });
+        };
+
+
+
+        var cmRects = svgCM.selectAll("rect")
+                          .data(cmDataset)
+                          .enter()
+                          .append("rect")
+                          .attr("width", cmWidth)
+                          .attr("height", cmWidth)
+                          .attr("fill", "white")
+                          .attr("stroke", "teal")
+                          .attr("stroke-width", 5)
+                          .attr("x", function(d, i) {
+                                    return i < 2 ? cmPad : cmWidth + cmPad;
+                                  })
+                          .attr("y", function(d, i) {
+                                    return i % 2 === 0 ? cmPad : cmWidth + cmPad;
+                                  });
+
+        /*svgCM.selectAll("text")
+               .data(cmDataset)
+               .enter()
+               .append("text")
+               .attr("class", "cmText")
+               .text(function(d) {
+                 return(d);
+               })
+               .attr("x", function(d, i) {
+                 return i < 2 ? cmPad + (cmWidth)/2 : cmPad + 1.5 * cmWidth;
+               })
+               .attr("y", function(d, i) {
+                 return i % 2 === 0 ? cmPad + (cmWidth)/2 : cmPad + 1.5 * cmWidth;
+               })
+               .attr("font-family", "sans-serif")
+               .attr("font-size", String(cmTextSz) + "px")
+               .style("text-anchor", "middle");*/
+
+        var cmLabel1 = svgCM.append("text")
+                            .text("Predicted")
+                            .attr("x", cmPad + cmWidth)
+                            .attr("y", cmPad/2)
+                            .style("text-anchor", "middle")
+                            .attr("font-family", "sans-serif")
+                            .attr("font-size", String(cmLabelSz) + "px");
+
+        var cmLabel2 = svgCM.append("svg:text")
+                            .text("Truth")
+                            .attr("x", cmPad/2)
+                            .attr("y", cmPad + cmWidth)
+                            .style("text-anchor", "middle")
+                            .attr("transform", 'translate(-' + String(cmPad * 2) + ',' + String(cmWidth * 2) + ') rotate(-90)')
+                            .attr("font-family", "sans-serif")
+                            .attr("font-size", String(cmLabelSz) + "px");
+
+
+
+        /*svgCM.append("rect")
+            .attr("class", "cm")
+            .attr("x", 50)
+            .attr("y", 20)
+            .attr("width", 150)
+            .attr("height", 150)
+            .attr("fill", "white")
+            .attr("stroke", "teal")
+            .attr("stroke-width", 5);*/
+        </script>
+    </body>
+</html>
